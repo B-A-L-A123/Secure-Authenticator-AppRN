@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "SecureAuthenticatorRN",
+    "slug": "SecureAuthenticatorRN",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/splash-icon.png",
+    "scheme": "secureauthenticator",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "jsEngine": "hermes",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a1a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1a1a1a"
+      }
+    },
+    "android": {
+      "package": "com.bala.secureauthenticatorrn",
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a1a"
+      },
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1a1a1a",
+        "mdpi": "./assets/images/splash-icon.png",
+        "hdpi": "./assets/images/splash-icon.png",
+        "xhdpi": "./assets/images/splash-icon.png",
+        "xxhdpi": "./assets/images/splash-icon.png",
+        "xxxhdpi": "./assets/images/splash-icon.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/splash-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-camera"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3ec7b2a7-68e0-45d6-9da3-7f39f002615b"
+      }
+    },
+    "owner": "b-a-l-a"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "app/(tabs)/website-check.tsx",
+    "app/(tabs)/ChangePIN.tsx",
+    "app/(tabs)/authenticator.tsx",
+    "app/(tabs)/_layout.tsx",
+    "nativewind-env.d.ts"
+, "app/(tabs)/SetupPin", "app/(tabs)/ChangePin", "app/index.js"  ]
+}
