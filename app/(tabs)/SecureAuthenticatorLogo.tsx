@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Dimensions, StyleSheet, View } from "react-native";
 import Svg, {
+  Circle,
   Defs,
   G,
   LinearGradient,
@@ -20,7 +21,7 @@ export default function SecureAuthenticatorLogo({
   onFinish,
   duration = 2500,
 }: SecureAuthenticatorLogoProps) {
-  const scale = useRef(new Animated.Value(0.90)).current;
+  const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const { width, height } = Dimensions.get("window");
 
@@ -53,7 +54,7 @@ export default function SecureAuthenticatorLogo({
         preserveAspectRatio="xMidYMid meet"
       >
         <Defs>
-          {/* Silver metallic border */}
+          {/* Silver metallic globe stroke */}
           <LinearGradient id="silver" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor="#ffffff" />
             <Stop offset="50%" stopColor="#bfc3c7" />
@@ -66,26 +67,56 @@ export default function SecureAuthenticatorLogo({
           opacity={opacity}
           origin="200, 280"
         >
-          {/* Outer Shield */}
-          <Path
-            d="M200 60 L345 120 V250 C345 380 270 450 200 490 C130 450 55 380 55 250 V120 L200 60 Z"
-            fill="url(#silver)"
-          />
-
-          {/* Inner Shield */}
-          <Path
-            d="M200 78 L325 130 V248 C325 360 265 425 200 460 C135 425 75 360 75 248 V130 L200 78 Z"
-            fill="#111111"
-          />
-
-          {/* Checkmark */}
-          <Path
-            d="M145 260 L185 300 L265 210"
-            stroke="#e6e6e6"
-            strokeWidth="26"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          {/* Globe Outer Circle */}
+          <Circle
+            cx="200"
+            cy="260"
+            r="120"
+            stroke="url(#silver)"
+            strokeWidth="8"
             fill="none"
+          />
+
+          {/* Longitude Lines */}
+          <Path
+            d="M200 140 C170 200 170 320 200 380
+               C230 320 230 200 200 140 Z"
+            stroke="#e6e6e6"
+            strokeWidth="3"
+            fill="none"
+          />
+
+          <Path
+            d="M200 140 C140 200 140 320 200 380"
+            stroke="#9a9a9a"
+            strokeWidth="2"
+            fill="none"
+          />
+
+          <Path
+            d="M200 140 C260 200 260 320 200 380"
+            stroke="#9a9a9a"
+            strokeWidth="2"
+            fill="none"
+          />
+
+          {/* Latitude Lines */}
+          <Path
+            d="M90 260 H310"
+            stroke="#e6e6e6"
+            strokeWidth="3"
+          />
+
+          <Path
+            d="M110 220 H290"
+            stroke="#9a9a9a"
+            strokeWidth="2"
+          />
+
+          <Path
+            d="M110 300 H290"
+            stroke="#9a9a9a"
+            strokeWidth="2"
           />
         </AnimatedG>
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "821748760820",
+    "project_id": "authenticator-ddc8c",
+    "storage_bucket": "authenticator-ddc8c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:821748760820:android:d4a7861618c467ae1b9ea1",
+        "android_client_info": {
+          "package_name": "com.bala.secureauthenticatorrn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATfVikUK5cZdIeKb_DwU5zSdXTIO12WsA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

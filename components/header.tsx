@@ -40,12 +40,6 @@ export default function Header({
   onSidebarClose
 }: HeaderProps) {
   return (
-
-    //  <SafeAreaProvider>
-    //       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-    //         <StatusBar barStyle="light-content" />
-    //         <View style={styles.screen}>
-              
     <>
       <SafeAreaView
         edges={['top']}
@@ -54,7 +48,7 @@ export default function Header({
           borderBottomColor: colors.border,
         }]}
       >
-         <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="light-content" />
         <View style={styles.headerContent}>
           {/* Left Section: Menu + Logo */}
           <View style={styles.headerLeft}>
@@ -67,7 +61,7 @@ export default function Header({
             </TouchableOpacity>
 
             <View style={styles.headerLogoContainer}>
-              <Feather name="shield" size={25} color={colors.accent} style={{ right: -35 }} />
+              <Feather name="globe" size={25} color={colors.accent} />
               <Text style={[styles.headerTitle, { color: colors.text }]}>
                 Krypta
               </Text>
@@ -93,14 +87,14 @@ export default function Header({
                   )}
                 </View>
                 
-                <View style={styles.headerUserInfo}>
+                {/* <View style={styles.headerUserInfo}>
                   <Text style={[styles.headerUserName, { color: colors.text }]} numberOfLines={1}>
                     {user.name}
                   </Text>
                   <Text style={[styles.headerUserEmail, { color: colors.textMuted }]} numberOfLines={1}>
                     {user.email}
                   </Text>
-                </View>
+                </View> */}
 
                 <TouchableOpacity
                   onPress={onSignOut}
@@ -141,16 +135,13 @@ export default function Header({
         />
       )}
     </>
-    //       </View>
-    //       </SafeAreaView>
-    //  </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 2,
     borderBottomWidth: 1.5,
     shadowColor: '#ffffff',
     shadowOffset: { width: 0, height: 2 },
@@ -163,11 +154,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    flex: 0,
+    flexShrink: 0,
   },
   menuButton: {
     width: 40,
@@ -180,7 +173,7 @@ const styles = StyleSheet.create({
   headerLogoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
+    gap: 8,
   },
   logoImage: {
     width: 24,
@@ -190,17 +183,20 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.3,
-    right: -19,
   },
   headerRight: {
+    
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   headerUserContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    maxWidth: 280,
+    gap: 90,
+    flex: 1,
+    maxWidth: '100%',
   },
   headerAvatar: {
     width: 38,
@@ -208,6 +204,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+    right: -80,
   },
   headerAvatarImage: {
     width: 38,
@@ -219,7 +217,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   headerUserInfo: {
-    maxWidth: 150,
+    flex: 1,
+    minWidth: 0,
   },
   headerUserName: {
     fontSize: 14,
@@ -235,6 +234,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   signInButton: {
     flexDirection: 'row',

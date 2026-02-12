@@ -4,38 +4,40 @@
     "slug": "SecureAuthenticatorRN",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/splash-icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "secureauthenticator",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "jsEngine": "hermes",
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#1a1a1a"
     },
     "ios": {
       "supportsTablet": true,
       "splash": {
-        "image": "./assets/images/splash-icon.png",
+        "image": "./assets/images/icon.fore.png",
         "resizeMode": "contain",
         "backgroundColor": "#1a1a1a"
       }
     },
     "android": {
       "package": "com.bala.secureauthenticatorrn",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.fore.png",
         "backgroundColor": "#1a1a1a"
       },
       "splash": {
-        "image": "./assets/images/splash-icon.png",
+        "image": "./assets/images/icon.fore.png",
         "resizeMode": "contain",
         "backgroundColor": "#1a1a1a",
-        "mdpi": "./assets/images/splash-icon.png",
-        "hdpi": "./assets/images/splash-icon.png",
-        "xhdpi": "./assets/images/splash-icon.png",
-        "xxhdpi": "./assets/images/splash-icon.png",
-        "xxxhdpi": "./assets/images/splash-icon.png"
+        "mdpi": "./assets/images/icon.fore.png",
+        "hdpi": "./assets/images/icon.fore.png",
+        "xhdpi": "./assets/images/icon.fore.png",
+        "xxhdpi": "./assets/images/icon.fore.png",
+        "xxxhdpi": "./assets/images/icon.fore.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -46,12 +48,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/splash-icon.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-camera"
+      "expo-camera",
+      
+      "@react-native-firebase/auth"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,21 +1,19 @@
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Clipboard from 'expo-clipboard';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
-;
 
 const colors = {
   background: '#000000',
@@ -23,6 +21,7 @@ const colors = {
   primary: '#00D4FF',
   textPrimary: '#FFFFFF',
   textSecondary: '#8E8E93',
+  cardBorder: '#2a2a2a',
 };
 
 interface Account {
@@ -32,160 +31,180 @@ interface Account {
   secret: string;
 }
 
+interface User {
+  id: string;
+}
+
 export default function ImportExportScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [showExportText, setShowExportText] = useState(false);
-  const [showImportText, setShowImportText] = useState(false);
-  const [importCode, setImportCode] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [storageKey, setStorageKey] = useState<string | null>(null);
+  const [showExportQR, setShowExportQR] = useState(false);
+  const [showImportCamera, setShowImportCamera] = useState(false);
+  const [currentExportIndex, setCurrentExportIndex] = useState(0);
 
+  // Enhanced user detection with account switching support
   useEffect(() => {
-    loadAccounts();
-  }, []);
+    const loadUserData = async () => {
+      try {
+        const savedUser = await AsyncStorage.getItem('user');
+        let uid: string | null = null;
 
-  const loadAccounts = async () => {
-    const stored = await AsyncStorage.getItem('auth_accounts_default');
-    if (stored) setAccounts(JSON.parse(stored));
-  };
+        if (savedUser) {
+          const user: User = JSON.parse(savedUser);
+          uid = user.id;
+        }
+
+        if (uid !== userId) {
+          console.log(`User changed from ${userId} to ${uid}`);
+          
+          setUserId(uid);
+          const key = uid ? `auth_accounts_${uid}` : 'auth_accounts_default';
+          setStorageKey(key);
+
+          const stored = await AsyncStorage.getItem(key);
+          setAccounts(stored ? JSON.parse(stored) : []);
+        }
+      } catch (e) {
+        console.error('Load error:', e);
+        setAccounts([]);
+      }
+    };
+
+    loadUserData();
+    const userCheckInterval = setInterval(loadUserData, 1000);
+    
+    return () => clearInterval(userCheckInterval);
+  }, [userId]);
 
   const saveAccounts = async (newAccounts: Account[]) => {
-    setAccounts(newAccounts);
-    await AsyncStorage.setItem('auth_accounts_default', JSON.stringify(newAccounts));
-  };
-
-  // ✅ Generate Base64 Encoded Backup Code
-  const generateBackupCode = () => {
-    const backupData = accounts.map((acc) => ({
-      name: acc.name,
-      email: acc.email,
-      secret: acc.secret,
-    }));
+    if (!storageKey) return;
     
-    const jsonString = JSON.stringify(backupData);
-    const base64Code = btoa(jsonString); // Encode to Base64
-    return base64Code;
-  };
-
-  // ✅ Copy Backup Code to Clipboard
-  const handleCopyBackup = async () => {
-    const backupCode = generateBackupCode();
-    await Clipboard.setStringAsync(backupCode);
-    Alert.alert('Copied!', 'Backup code copied to clipboard. You can now paste it on another phone.');
-  };
-
-  // ✅ Share Backup Code via Apps - FIXED VERSION
-  const handleShareBackup = async () => {
+    setAccounts(newAccounts);
     try {
-      const backupCode = generateBackupCode();
+      await AsyncStorage.setItem(storageKey, JSON.stringify(newAccounts));
+    } catch (e) {
+      console.error('Save error:', e);
+    }
+  };
+
+  // Generate export data for QR codes (one account per QR)
+  const getExportData = (index: number) => {
+    if (index >= accounts.length) return null;
+    
+    const account = accounts[index];
+    return {
+      name: account.name,
+      email: account.email,
+      secret: account.secret, // Encrypted secret
+    };
+  };
+
+  // Handle QR code scan for import
+  const handleQRScanned = async (data: string) => {
+    try {
+      const parsed = JSON.parse(data);
       
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Sharing not available', 'Please copy the code manually');
+      if (!parsed.name || !parsed.email || !parsed.secret) {
+        throw new Error('Invalid QR code format');
+      }
+
+      // Check for duplicates
+      const exists = accounts.some(acc => acc.secret === parsed.secret);
+      
+      if (exists) {
+        Alert.alert('Already Exists', 'This account is already saved');
+        setShowImportCamera(false);
         return;
       }
 
-      // Create a temporary file with proper file:// URI
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      const filename = `2FA_Backup_${timestamp}.txt`;
-      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      const newAccount: Account = {
+        id: Date.now(),
+        name: parsed.name,
+        email: parsed.email,
+        secret: parsed.secret, // Already encrypted
+      };
+
+      const updated = [...accounts, newAccount];
+      await saveAccounts(updated);
       
-      const fileContent = `My 2FA Backup Code:\n\n${backupCode}\n\nImport this code on your new phone to restore all accounts.`;
-      
-      // Write to file
-      await FileSystem.writeAsStringAsync(fileUri, fileContent);
-      
-      // Share the file
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/plain',
-        dialogTitle: 'Share Backup Code',
-        UTI: 'public.plain-text',
-      });
-      
-      // Optional: Clean up the file after sharing
-      // await FileSystem.deleteAsync(fileUri, { idempotent: true });
-      
-    } catch (error) {
-      console.error('Share error:', error);
-      Alert.alert('Error', 'Failed to share backup code');
+      Alert.alert('Success! 🎉', `${parsed.name} imported successfully`, [
+        {
+          text: 'Import More',
+          onPress: () => {
+            // Keep camera open for more imports
+          },
+        },
+        {
+          text: 'Done',
+          onPress: () => setShowImportCamera(false),
+        },
+      ]);
+    } catch (err) {
+      Alert.alert('Error', 'Invalid QR code. Please scan a valid 2FA backup QR code.');
     }
   };
 
-  // ✅ Import Accounts from Backup Code
-  const handleImportBackup = async () => {
-    if (!importCode.trim()) {
-      Alert.alert('Error', 'Please paste your backup code');
+  const handleExportStart = () => {
+    if (accounts.length === 0) {
+      Alert.alert('No Accounts', 'You have no accounts to export');
       return;
     }
-
-    try {
-      // Decode Base64
-      const jsonString = atob(importCode.trim());
-      const parsed = JSON.parse(jsonString);
-
-      if (!Array.isArray(parsed)) throw new Error('Invalid backup code');
-
-      const newAccounts = parsed.map((acc, i) => ({
-        id: Date.now() + i,
-        name: acc.name,
-        email: acc.email,
-        secret: acc.secret.toUpperCase(),
-      }));
-
-      // Filter out duplicates
-      const existingSecrets = new Set(accounts.map((a) => a.secret));
-      const uniqueNew = newAccounts.filter((acc) => !existingSecrets.has(acc.secret));
-
-      if (uniqueNew.length > 0) {
-        const updated = [...accounts, ...uniqueNew];
-        await saveAccounts(updated);
-        setShowImportText(false);
-        setImportCode('');
-        Alert.alert('Success! 🎉', `${uniqueNew.length} accounts imported successfully`);
-      } else {
-        Alert.alert('No New Accounts', 'All accounts already exist');
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Invalid backup code. Please check and try again.');
-    }
+    setCurrentExportIndex(0);
+    setShowExportQR(true);
   };
 
-  // ✅ Paste from Clipboard
-  const handlePasteFromClipboard = async () => {
-    const text = await Clipboard.getStringAsync();
-    if (text) {
-      setImportCode(text);
+  const handleNextExport = () => {
+    if (currentExportIndex < accounts.length - 1) {
+      setCurrentExportIndex(currentExportIndex + 1);
     } else {
-      Alert.alert('Empty Clipboard', 'No text found in clipboard');
+      setShowExportQR(false);
+      setCurrentExportIndex(0);
+      Alert.alert('Complete', 'All accounts have been exported');
     }
   };
+
+  const handlePreviousExport = () => {
+    if (currentExportIndex > 0) {
+      setCurrentExportIndex(currentExportIndex - 1);
+    }
+  };
+
+  const exportData = getExportData(currentExportIndex);
+  const qrSize = Math.min(Dimensions.get('window').width - 100, 280);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Backup & Restore</Text>
+        {/* <Text style={styles.title}>Backup & Restore</Text> */}
+        
+        {/* {userId && (
+          <View style={styles.userBanner}>
+            <Feather name="user" size={16} color={colors.primary} />
+            <Text style={styles.userText}>Logged in as: {userId}</Text>
+          </View>
+        )} */}
         
         <Text style={styles.subtitle}>Export Your Accounts</Text>
+        <Text style={styles.description}>
+          Export accounts one by one using QR codes. Scan each QR code on your new device.
+        </Text>
 
-        <Pressable style={styles.primaryButton} onPress={handleCopyBackup}>
-          <Feather name="copy" size={24} color="#000" />
-          <Text style={styles.primaryText}>Copy Backup Code</Text>
-        </Pressable>
-
-        <Pressable style={styles.secondaryButton} onPress={handleShareBackup}>
-          <Feather name="share-2" size={24} color={colors.textPrimary} />
-          <Text style={styles.secondaryText}>Share Backup Code</Text>
-        </Pressable>
-
-        <Pressable style={styles.secondaryButton} onPress={() => setShowExportText(true)}>
-          <Feather name="eye" size={24} color={colors.textPrimary} />
-          <Text style={styles.secondaryText}>View Backup Code</Text>
+        <Pressable style={styles.primaryButton} onPress={handleExportStart}>
+          <Feather name="upload" size={24} color="#000" />
+          <Text style={styles.primaryText}>Export via QR Code</Text>
         </Pressable>
 
         <View style={styles.divider} />
 
         <Text style={styles.subtitle}>Import Accounts</Text>
+        <Text style={styles.description}>
+          Scan QR codes from your old device to import accounts.
+        </Text>
 
-        <Pressable style={styles.primaryButton} onPress={() => setShowImportText(true)}>
+        <Pressable style={styles.primaryButton} onPress={() => setShowImportCamera(true)}>
           <Feather name="download" size={24} color="#000" />
-          <Text style={styles.primaryText}>Import Backup Code</Text>
+          <Text style={styles.primaryText}>Import via QR Code</Text>
         </Pressable>
 
         <View style={styles.statsCard}>
@@ -194,104 +213,198 @@ export default function ImportExportScreen() {
         </View>
       </ScrollView>
 
-      {/* Export Text Modal */}
-      <Modal visible={showExportText} transparent animationType="fade">
+      {/* Export QR Modal */}
+      <Modal visible={showExportQR} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCardLarge}>
-            <Text style={styles.modalTitle}>Your Backup Code</Text>
-            <Text style={styles.modalSubtitle}>Copy this code and save it securely</Text>
-
-            <ScrollView style={styles.codeContainer}>
-              <Text style={styles.codeText} selectable>
-                {generateBackupCode()}
-              </Text>
-            </ScrollView>
-
-            <View style={styles.buttonRow}>
-              <Pressable 
-                style={[styles.modalButton, styles.primaryButton]} 
-                onPress={async () => {
-                  await handleCopyBackup();
-                  setShowExportText(false);
-                }}
-              >
-                <Feather name="copy" size={20} color="#000" />
-                <Text style={styles.primaryText}>Copy</Text>
-              </Pressable>
-
-              <Pressable 
-                style={[styles.modalButton, styles.secondaryButton]} 
-                onPress={() => setShowExportText(false)}
-              >
-                <Text style={styles.secondaryText}>Close</Text>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Export Account</Text>
+              <Pressable onPress={() => {
+                setShowExportQR(false);
+                setCurrentExportIndex(0);
+              }}>
+                <Feather name="x" size={24} color={colors.textPrimary} />
               </Pressable>
             </View>
+
+            {exportData && (
+              <>
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountName}>{exportData.name}</Text>
+                  <Text style={styles.accountEmail}>{exportData.email}</Text>
+                  <Text style={styles.accountProgress}>
+                    Account {currentExportIndex + 1} of {accounts.length}
+                  </Text>
+                </View>
+
+                <View style={styles.qrContainer}>
+                  <QRCode
+                    value={JSON.stringify(exportData)}
+                    size={qrSize}
+                    color="#000000"
+                    backgroundColor="#FFFFFF"
+                  />
+                </View>
+
+                <Text style={styles.qrInstruction}>
+                  Scan this QR code on your new device to import this account
+                </Text>
+
+                <View style={styles.navigationButtons}>
+                  <Pressable
+                    style={[
+                      styles.navButton,
+                      currentExportIndex === 0 && styles.navButtonDisabled,
+                    ]}
+                    onPress={handlePreviousExport}
+                    disabled={currentExportIndex === 0}
+                  >
+                    <Feather
+                      name="chevron-left"
+                      size={24}
+                      color={currentExportIndex === 0 ? colors.textSecondary : colors.textPrimary}
+                    />
+                    <Text
+                      style={[
+                        styles.navButtonText,
+                        currentExportIndex === 0 && styles.navButtonTextDisabled,
+                      ]}
+                    >
+                      Previous
+                    </Text>
+                  </Pressable>
+
+                  <Pressable style={styles.navButton} onPress={handleNextExport}>
+                    <Text style={styles.navButtonText}>
+                      {currentExportIndex < accounts.length - 1 ? 'Next' : 'Done'}
+                    </Text>
+                    <Feather name="chevron-right" size={24} color={colors.textPrimary} />
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
 
-      {/* Import Text Modal */}
-      <Modal visible={showImportText} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCardLarge}>
-            <Text style={styles.modalTitle}>Import Backup Code</Text>
-            <Text style={styles.modalSubtitle}>Paste your backup code below</Text>
-
-            <TextInput
-              style={styles.textInput}
-              placeholder="Paste backup code here..."
-              placeholderTextColor={colors.textSecondary}
-              value={importCode}
-              onChangeText={setImportCode}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-
-            <Pressable 
-              style={[styles.pasteButton]} 
-              onPress={handlePasteFromClipboard}
-            >
-              <Feather name="clipboard" size={20} color={colors.textPrimary} />
-              <Text style={styles.secondaryText}>Paste from Clipboard</Text>
-            </Pressable>
-
-            <View style={styles.buttonRow}>
-              <Pressable 
-                style={[styles.modalButton, styles.primaryButton]} 
-                onPress={handleImportBackup}
-              >
-                <Feather name="download" size={20} color="#000" />
-                <Text style={styles.primaryText}>Import</Text>
-              </Pressable>
-
-              <Pressable 
-                style={[styles.modalButton, styles.secondaryButton]} 
-                onPress={() => {
-                  setShowImportText(false);
-                  setImportCode('');
-                }}
-              >
-                <Text style={styles.secondaryText}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Import Camera Modal */}
+      {showImportCamera && (
+        <QRScannerModal
+          onScanned={handleQRScanned}
+          onClose={() => setShowImportCamera(false)}
+        />
+      )}
     </SafeAreaView>
+  );
+}
+
+// QR Scanner Component
+interface QRScannerModalProps {
+  onScanned: (data: string) => void;
+  onClose: () => void;
+}
+
+function QRScannerModal({ onScanned, onClose }: QRScannerModalProps) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+
+  if (!permission) {
+    return (
+      <Modal visible animationType="slide">
+        <View style={styles.scannerWrap}>
+          <View style={styles.scannerDenied}>
+            <Text style={styles.scannerDeniedText}>Loading camera...</Text>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  if (!permission.granted) {
+    return (
+      <Modal visible animationType="slide">
+        <View style={styles.scannerWrap}>
+          <View style={styles.scannerDenied}>
+            <Text style={styles.scannerDeniedText}>
+              Camera permission is required to scan QR codes
+            </Text>
+            <Pressable onPress={requestPermission} style={styles.permissionButton}>
+              <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal visible animationType="slide">
+      <View style={styles.scannerWrap}>
+        <View style={styles.scannerHeader}>
+          <Text style={styles.scannerTitle}>Scan QR Code</Text>
+          <Pressable onPress={onClose}>
+            <Feather name="x" size={24} color="#fff" />
+          </Pressable>
+        </View>
+
+        <CameraView
+          style={{ flex: 1 }}
+          facing="back"
+          onBarcodeScanned={
+            scanned
+              ? undefined
+              : ({ data }) => {
+                  setScanned(true);
+                  onScanned(data);
+                  setTimeout(() => setScanned(false), 2000);
+                }
+          }
+        >
+          <View style={styles.frameCenter}>
+            <View style={styles.frame} />
+          </View>
+          <View style={styles.scannerHintWrap}>
+            <Text style={styles.scannerHint}>Point your camera at a QR code</Text>
+          </View>
+        </CameraView>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 24 },
+  content: { padding: 24, paddingBottom: 40 },
   title: { fontSize: 28, color: colors.textPrimary, fontWeight: '700', marginBottom: 8 },
+  
+  userBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.cardBg,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  userText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  
   subtitle: { 
     fontSize: 18, 
     color: colors.textPrimary, 
     fontWeight: '600', 
     marginTop: 20,
-    marginBottom: 12 
+    marginBottom: 8,
+  },
+  
+  description: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
   },
 
   primaryButton: {
@@ -305,19 +418,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   primaryText: { fontSize: 16, fontWeight: '700', color: '#000' },
-
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: colors.textSecondary,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  secondaryText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
 
   divider: {
     height: 1,
@@ -338,75 +438,179 @@ const styles = StyleSheet.create({
 
   modalOverlay: { 
     flex: 1, 
-    backgroundColor: '#000000cc', 
+    backgroundColor: 'rgba(0, 0, 0, 0.95)', 
     justifyContent: 'center', 
     alignItems: 'center',
     padding: 20,
   },
-  modalCardLarge: { 
+  
+  modalCard: { 
     backgroundColor: colors.cardBg, 
     padding: 24, 
     borderRadius: 18, 
     width: '100%',
     maxWidth: 400,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
+  
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  
   modalTitle: { 
     color: colors.textPrimary, 
     fontSize: 20, 
     fontWeight: '700',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginBottom: 16,
-    textAlign: 'center',
   },
 
-  codeContainer: {
-    backgroundColor: colors.background,
-    padding: 12,
-    borderRadius: 10,
-    maxHeight: 200,
-    marginBottom: 16,
+  accountInfo: {
+    marginBottom: 20,
+    alignItems: 'center',
   },
-  codeText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontFamily: 'monospace',
-  },
-
-  textInput: {
-    backgroundColor: colors.background,
+  
+  accountName: {
+    fontSize: 18,
+    fontWeight: '700',
     color: colors.textPrimary,
-    padding: 12,
-    borderRadius: 10,
+    marginBottom: 4,
+  },
+  
+  accountEmail: {
     fontSize: 14,
-    minHeight: 120,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.textSecondary,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  
+  accountProgress: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
   },
 
-  pasteButton: {
-    borderWidth: 1,
-    borderColor: colors.textSecondary,
-    padding: 12,
-    borderRadius: 10,
+  qrContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
+  },
+  
+  qrInstruction: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+
+  navigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  
+  navButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.textSecondary,
     gap: 8,
   },
-
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
+  
+  navButtonDisabled: {
+    opacity: 0.4,
   },
-  modalButton: {
-    flex: 1,
-    padding: 14,
+  
+  navButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  
+  navButtonTextDisabled: {
+    color: colors.textSecondary,
+  },
+
+  // Scanner styles
+  scannerWrap: { flex: 1, backgroundColor: '#000' },
+  
+  scannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 50,
+  },
+  
+  scannerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+  
+  scannerDenied: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 20 
+  },
+  
+  scannerDeniedText: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  
+  permissionButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  
+  permissionButtonText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#000' 
+  },
+  
+  frameCenter: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  frame: {
+    width: 250,
+    height: 250,
+    borderWidth: 3,
+    borderColor: colors.primary,
+    borderRadius: 16,
+  },
+  
+  scannerHintWrap: {
+    position: 'absolute',
+    bottom: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  
+  scannerHint: {
+    fontSize: 16,
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
   },
 });

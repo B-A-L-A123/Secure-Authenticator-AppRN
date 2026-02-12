@@ -86,7 +86,7 @@ export default function Sidebar({
         <View style={[styles.sidebarHeader, { paddingTop: insets.top + 10 }]}>
           <View style={styles.logoContainer}>
             <View style={[styles.logoIcon, { backgroundColor: colors.bg, borderColor: colors.border, borderWidth: 1 }]}>
-              <Feather name="shield" size={26} color={colors.accent} />
+              <Feather name="globe" size={26} color={colors.accent} />
             </View>
             <Text style={[styles.logoText, { color: colors.text }]}>
               Krypta
