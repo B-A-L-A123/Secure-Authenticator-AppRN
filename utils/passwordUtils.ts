@@ -1,9 +1,19 @@
+import * as Crypto from 'expo-crypto';
 import type { PasswordOptions } from './types';
 
 const LOWER = 'abcdefghijklmnopqrstuvwxyz';
 const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const NUMBERS = '0123456789';
 const SYMBOLS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+/**
+ * Get a cryptographically secure random index
+ */
+function secureRandomIndex(max: number): number {
+  const bytes = Crypto.getRandomBytes(4);
+  const value = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+  return value % max;
+}
 
 /**
  * Generate a random password based on the given options
@@ -19,7 +29,7 @@ export function generatePassword(options: PasswordOptions): string {
 
   let password = '';
   for (let i = 0; i < options.length; i++) {
-    const index = Math.floor(Math.random() * charset.length);
+    const index = secureRandomIndex(charset.length);
     password += charset[index];
   }
   return password;
