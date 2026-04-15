@@ -1,8 +1,7 @@
 // AuthWrapper.tsx
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
+import { authenticate, isPrivacyScreenEnabled } from '../utils/biometricManager';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -26,21 +25,21 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
 
   const handleAppStateChange = async (nextAppState: string) => {
     if (nextAppState === 'active') {
-      const privacyEnabled = await AsyncStorage.getItem('privacyScreenEnabled');
-      if (privacyEnabled === 'true') {
+      const privacyEnabled = await isPrivacyScreenEnabled();
+      if (privacyEnabled) {
         setIsAuthenticated(false);
-        await authenticate();
+        await doAuthenticate();
       }
     }
   };
 
   const checkAuthRequirement = async () => {
     try {
-      const privacyScreenEnabled = await AsyncStorage.getItem('privacyScreenEnabled');
+      const privacyEnabled = await isPrivacyScreenEnabled();
       
-      if (privacyScreenEnabled === 'true') {
+      if (privacyEnabled) {
         setAuthRequired(true);
-        await authenticate();
+        await doAuthenticate();
       } else {
         setIsAuthenticated(true);
         setIsLoading(false);
@@ -52,29 +51,17 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     }
   };
 
-  const authenticate = async () => {
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to access the app',
-        fallbackLabel: 'Use Device Authentication',
-        cancelLabel: 'Cancel',
-        disableDeviceFallback: false,
-      });
+  const doAuthenticate = async () => {
+    const success = await authenticate('Authenticate to access the app');
 
-      if (result.success) {
-        setIsAuthenticated(true);
-      } else {
-        // User cancelled or authentication failed
-        setIsAuthenticated(false);
-        // Retry authentication after a short delay
-        setTimeout(() => authenticate(), 1000);
-      }
-    } catch (error) {
-      console.error('Authentication error:', error);
+    if (success) {
+      setIsAuthenticated(true);
+    } else {
       setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
+      // Retry authentication after a short delay
+      setTimeout(() => doAuthenticate(), 1000);
     }
+    setIsLoading(false);
   };
 
   if (isLoading) {

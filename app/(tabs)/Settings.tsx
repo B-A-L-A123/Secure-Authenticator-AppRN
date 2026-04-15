@@ -1,5 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -14,14 +12,9 @@ import {
   restoreAccountsFromCloud,
   uploadAccountsToCloud,
 } from '..//../cloud/cloudsyn';
-
-type Account = {
-  id: string;
-  name: string;
-  deleted?: boolean;
-  deletedAt?: string;
-  [key: string]: any;
-};
+import type { Account } from '../../utils/types';
+import { checkBiometricAvailability, authenticate, setPrivacyScreen, isPrivacyScreenEnabled } from '../../utils/biometricManager';
+import { loadCurrentUser, getUserStorageKey, loadAccounts, saveAccounts } from '../../utils/storageManager';
 
 export default function Settings() {
   const [privacyScreenEnabled, setPrivacyScreenEnabled] = useState(false);
@@ -34,18 +27,25 @@ export default function Settings() {
   const allowCloudSyncRef = useRef<boolean>(true);
 
   useEffect(() => {
-    checkBiometricAvailability();
-    loadSettings();
-    loadUser();
+    initSettings();
   }, []);
 
-  const loadUser = async () => {
-    const savedUser = await AsyncStorage.getItem('user');
-    if (!savedUser) return;
+  const initSettings = async () => {
+    // Check biometric availability
+    const biometric = await checkBiometricAvailability();
+    setBiometricAvailable(biometric.available);
+    setBiometricType(biometric.type);
 
-    const user = JSON.parse(savedUser);
-    setUserId(user.id);
-    setStorageKey(`auth_accounts_${user.id}`);
+    // Load privacy setting
+    const privacyEnabled = await isPrivacyScreenEnabled();
+    setPrivacyScreenEnabled(privacyEnabled);
+
+    // Load user
+    const currentUser = await loadCurrentUser();
+    if (currentUser) {
+      setUserId(currentUser.id);
+      setStorageKey(getUserStorageKey(currentUser.id));
+    }
   };
 
   /* =====================================================
@@ -54,33 +54,10 @@ export default function Settings() {
   useEffect(() => {
     if (!storageKey) return;
 
-    AsyncStorage.getItem(storageKey).then(stored => {
-      if (stored) {
-        setAccounts(JSON.parse(stored));
-      }
+    loadAccounts(storageKey).then(stored => {
+      setAccounts(stored);
     });
   }, [storageKey]);
-
-  const checkBiometricAvailability = async () => {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-
-    setBiometricAvailable(compatible && enrolled);
-
-    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-      setBiometricType('Face ID');
-    } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-      setBiometricType('Fingerprint');
-    } else {
-      setBiometricType('Screen Lock');
-    }
-  };
-
-  const loadSettings = async () => {
-    const privacy = await AsyncStorage.getItem('privacyScreenEnabled');
-    setPrivacyScreenEnabled(privacy === 'true');
-  };
 
   /* ================= RESTORE (UNCHANGED) ================= */
   const handleRestoreAllAccounts = async () => {
@@ -104,10 +81,7 @@ export default function Settings() {
       );
 
       allowCloudSyncRef.current = false;
-      await AsyncStorage.setItem(
-        storageKey,
-        JSON.stringify(restoredAccounts)
-      );
+      await saveAccounts(storageKey, restoredAccounts);
 
       await uploadAccountsToCloud(userId, restoredAccounts);
 
@@ -129,7 +103,7 @@ export default function Settings() {
           setAccounts([]);
 
           if (storageKey) {
-            await AsyncStorage.removeItem(storageKey);
+            await saveAccounts(storageKey, []);
           }
           if (userId) {
             await uploadAccountsToCloud(userId, []);
@@ -143,17 +117,15 @@ export default function Settings() {
     if (!biometricAvailable) return;
 
     if (value) {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to enable privacy screen',
-      });
+      const success = await authenticate('Authenticate to enable privacy screen');
 
-      if (result.success) {
+      if (success) {
         setPrivacyScreenEnabled(true);
-        await AsyncStorage.setItem('privacyScreenEnabled', 'true');
+        await setPrivacyScreen(true);
       }
     } else {
       setPrivacyScreenEnabled(false);
-      await AsyncStorage.setItem('privacyScreenEnabled', 'false');
+      await setPrivacyScreen(false);
     }
   };
 

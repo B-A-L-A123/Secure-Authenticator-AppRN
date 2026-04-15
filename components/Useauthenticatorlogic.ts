@@ -5,7 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { decryptSecret, encryptSecret } from '../Security/crypto';
 import { restoreAccountsFromCloud, uploadAccountsToCloud } from '../cloud/cloudsyn';
-import { Account, CloudAccount, ParsedOTPAuth, User } from './Authenticator.types';
+import { isValidBase32, parseOTPAuthURI } from '../utils/validators';
+import { mergeAccounts, syncAccountsToCloud } from '../utils/storageManager';
+import type { Account, User } from '../utils/types';
+
+// Re-export for backward compatibility
+export { isValidBase32, parseOTPAuthURI, mergeAccounts };
 
 // ===== TIME SYNCHRONIZATION =====
 let timeOffset = 0;
@@ -90,12 +95,6 @@ async function syncTime(): Promise<void> {
   }
 }
 
-// ===== Helper Functions =====
-export function isValidBase32(str: string): boolean {
-  const cleaned = str.replace(/\s/g, '').toUpperCase();
-  return /^[A-Z2-7]+=*$/.test(cleaned);
-}
-
 // ===== TOTP Generation =====
 export async function generateTOTP(secret: string): Promise<string> {
   try {
@@ -108,42 +107,6 @@ export async function generateTOTP(secret: string): Promise<string> {
     return '000000';
   }
 }
-
-export function parseOTPAuthURI(uri: string): ParsedOTPAuth {
-  const match = uri.match(/otpauth:\/\/totp\/([^?]+)\?secret=([A-Z2-7]+)/i);
-  if (!match) {
-    return { secret: '', issuer: '', label: '' };
-  }
-  
-  const label = decodeURIComponent(match[1]);
-  const secret = match[2];
-  const parts = label.split(':');
-  
-  return {
-    secret,
-    issuer: parts.length > 1 ? parts[0] : '',
-    label: parts.length > 1 ? parts[1] : parts[0],
-  };
-}
-
-// Merge accounts from local and cloud storage
-export const mergeAccounts = (local: Account[], cloud: Account[]) => {
-  const map = new Map<string, Account>();
-  
-  // First, add all cloud accounts (including soft-deleted ones)
-  cloud.forEach(acc => {
-    map.set(acc.secret, acc);
-  });
-  
-  // Then merge in local accounts that aren't in cloud
-  local.forEach(acc => {
-    if (!map.has(acc.secret)) {
-      map.set(acc.secret, acc);
-    }
-  });
-  
-  return Array.from(map.values());
-};
 
 export function useAuthenticatorLogic() {
   const [fabOpen, setFabOpen] = useState<boolean>(false);
@@ -234,34 +197,7 @@ export function useAuthenticatorLogic() {
 
         // Upload to cloud with merge logic
         if (allowCloudSyncRef.current) {
-          // Get current cloud state
-          const cloudAccounts = await restoreAccountsFromCloud(userId);
-          
-          // Create a map of cloud accounts by secret
-          const cloudMap = new Map<string, Account>();
-          if (cloudAccounts) {
-            cloudAccounts.forEach(acc => cloudMap.set(acc.secret, acc));
-          }
-          
-          // Merge: Add or update accounts from local state
-          accounts.forEach(acc => {
-            cloudMap.set(acc.secret, {
-              ...acc,
-              deleted: false // Active accounts in local should be marked as not deleted
-            });
-          });
-          
-          // Convert back to array and upload (includes soft-deleted accounts)
-          const mergedAccounts = Array.from(cloudMap.values());
-          const cloudPayload: CloudAccount[] = mergedAccounts.map(acc => ({
-            id: acc.id,
-            name: acc.name,
-            email: acc.email,
-            secret: acc.secret,
-            deleted: acc.deleted ?? false,
-          }));
-
-          await uploadAccountsToCloud(userId, cloudPayload);
+          await syncAccountsToCloud(userId, accounts);
         }
       } catch (e) {
         console.error('Save error:', e);

@@ -1,13 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-
-export interface CloudAccount {
-  deleted: any;
-  id: number;
-  name: string;
-  email: string;
-  secret: string; 
-}
+import type { CloudAccount } from '../utils/types';
 
 interface CloudPayload {
   accounts: CloudAccount[];

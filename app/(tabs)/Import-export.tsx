@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useState } from 'react';
 import {
@@ -14,6 +13,8 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Account } from '../../utils/types';
+import { getUserStorageKey, loadCurrentUser, loadAccounts, saveAccounts } from '../../utils/storageManager';
 
 const colors = {
   background: '#000000',
@@ -23,17 +24,6 @@ const colors = {
   textSecondary: '#8E8E93',
   cardBorder: '#2a2a2a',
 };
-
-interface Account {
-  id: number;
-  name: string;
-  email: string;
-  secret: string;
-}
-
-interface User {
-  id: string;
-}
 
 export default function ImportExportScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -47,23 +37,18 @@ export default function ImportExportScreen() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const savedUser = await AsyncStorage.getItem('user');
-        let uid: string | null = null;
-
-        if (savedUser) {
-          const user: User = JSON.parse(savedUser);
-          uid = user.id;
-        }
+        const currentUser = await loadCurrentUser();
+        const uid = currentUser?.id ?? null;
 
         if (uid !== userId) {
           console.log(`User changed from ${userId} to ${uid}`);
           
           setUserId(uid);
-          const key = uid ? `auth_accounts_${uid}` : 'auth_accounts_default';
+          const key = getUserStorageKey(uid);
           setStorageKey(key);
 
-          const stored = await AsyncStorage.getItem(key);
-          setAccounts(stored ? JSON.parse(stored) : []);
+          const storedAccounts = await loadAccounts(key);
+          setAccounts(storedAccounts);
         }
       } catch (e) {
         console.error('Load error:', e);
@@ -77,15 +62,11 @@ export default function ImportExportScreen() {
     return () => clearInterval(userCheckInterval);
   }, [userId]);
 
-  const saveAccounts = async (newAccounts: Account[]) => {
+  const handleSaveAccounts = async (newAccounts: Account[]) => {
     if (!storageKey) return;
     
     setAccounts(newAccounts);
-    try {
-      await AsyncStorage.setItem(storageKey, JSON.stringify(newAccounts));
-    } catch (e) {
-      console.error('Save error:', e);
-    }
+    await saveAccounts(storageKey, newAccounts);
   };
 
   // Generate export data for QR codes (one account per QR)
@@ -126,7 +107,7 @@ export default function ImportExportScreen() {
       };
 
       const updated = [...accounts, newAccount];
-      await saveAccounts(updated);
+      await handleSaveAccounts(updated);
       
       Alert.alert('Success! 🎉', `${parsed.name} imported successfully`, [
         {
