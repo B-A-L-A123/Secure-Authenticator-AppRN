@@ -11,14 +11,8 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-
-type SavedAccount = {
-  id: string;
-  accountName: string;
-  username: string;
-  password: string;
-  createdAt: number;
-};
+import type { SavedAccount } from '../../utils/types';
+import { analyzePasswordStrength } from '../../utils/passwordUtils';
 
 export default function PasswordVaultScreen() {
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
@@ -61,24 +55,6 @@ export default function PasswordVaultScreen() {
 
   const togglePasswordVisibility = (id: string) => {
     setVisiblePasswords({ ...visiblePasswords, [id]: !visiblePasswords[id] });
-  };
-
-  const analyzePasswordStrength = (password: string): { strength: string; color: string } => {
-    if (!password) return { strength: "None", color: "#666" };
-
-    let score = 0;
-    
-    if (password.length >= 12) score += 2;
-    else if (password.length >= 8) score += 1;
-    
-    if (/[a-z]/.test(password)) score += 1;
-    if (/[A-Z]/.test(password)) score += 1;
-    if (/[0-9]/.test(password)) score += 1;
-    if (/[^a-zA-Z0-9]/.test(password)) score += 1;
-
-    if (score <= 3) return { strength: "WEAK", color: "#ef4444" };
-    if (score <= 5) return { strength: "MODERATE", color: "#f97316" };
-    return { strength: "STRONG", color: "#22c55e" };
   };
 
   const filteredAccounts = savedAccounts.filter((account) =>
